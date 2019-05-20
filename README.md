@@ -57,8 +57,7 @@ Each run creates a folder in ./runs/<experiment_name date-and-time> and stores a
 You can specify noise layers configuration. To do so, use the ```--noise``` switch, following by configuration of noise layer or layers.
 For instance, the command 
 ```
-python main.py new --name 'combined-noise' --data-dir /data/ --batch-size 12 --noise  'crop((0.2,0.3),(0.4,0.5))+cropout((0
-.11,0.22),(0.33,0.44))+dropout(0.2,0.3)+jpeg()'
+python main.py new --name 'combined-noise' --data-dir ./data/ --batch-size 12 --noise  'crop((0.2,0.3),(0.4,0.5))+cropout((0.11,0.22),(0.33,0.44))+dropout(0.2,0.3)+jpeg()'
 ```
 runs the training with the following noise layers applied to each watermarked image: crop, then cropout, then dropout, then jpeg compression. The parameters of the layers are explained below. **It is important to use the quotes around the noise configuration. Also, avoid redundant spaces** If you want to stack several noise layers, specify them using + in the noise configuration, as shown in the example. 
 
