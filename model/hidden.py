@@ -63,7 +63,7 @@ class Hidden:
         :param batch: batch of training data, in the form [images, messages]
         :return: dictionary of error metrics from Encoder, Decoder, and Discriminator on the current batch
         """
-        images, captions, lengths = batch
+        images, ekeys, dkeys, captions, lengths = batch
 
         batch_size = images.shape[0]
         self.encoder_decoder.train()
@@ -82,7 +82,7 @@ class Hidden:
 
             # train on fake
             encoded_images, noised_images, decoded_captions, \
-                encoded_message, decoded_message, _ = self.encoder_decoder(images, captions, lengths)
+                encoded_message, decoded_message, _ = self.encoder_decoder(images, ekeys, dkeys, captions, lengths)
             d_on_encoded = self.discriminator(encoded_images.detach())
             d_loss_on_encoded = self.bce_with_logits_loss(d_on_encoded, d_target_label_encoded)
 
@@ -140,7 +140,7 @@ class Hidden:
             discrim_final = self.discriminator._modules['linear']
             self.tb_logger.add_tensor('weights/discrim_out', discrim_final.weight)
 
-        images, captions, lengths = batch
+        images, ekeys, dkeys, captions, lengths = batch
 
         batch_size = images.shape[0]
 
@@ -155,7 +155,7 @@ class Hidden:
             d_loss_on_cover = self.bce_with_logits_loss(d_on_cover, d_target_label_cover)
 
             encoded_images, noised_images, decoded_captions, \
-                encoded_message, decoded_message, predicted_sents = self.encoder_decoder(images, captions, lengths)
+                encoded_message, decoded_message, predicted_sents = self.encoder_decoder(images, ekeys, dkeys, captions, lengths)
 
             d_on_encoded = self.discriminator(encoded_images)
             d_loss_on_encoded = self.bce_with_logits_loss(d_on_encoded, d_target_label_encoded)

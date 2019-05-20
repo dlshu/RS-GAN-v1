@@ -91,9 +91,15 @@ def main():
         captions[i, :end] = target[:end]
     captions = captions.to(device)
 
-    losses, (encoded_images, noised_images, decoded_messages, predicted_sents) = \
-        hidden_net.validate_on_batch([images, captions, lengths])
+    keys = np.random.permutation(512)
+    ekeys = torch.Tensor(np.eye(512)[keys])
+    dkeys = torch.Tensor(np.transpose(ekeys))
+    ekeys = torch.stack([ekeys for _ in range(args.batch_size)]).to(device)
+    dkeys = torch.stack([dkeys for _ in range(args.batch_size)]).to(device)
+    #print(f'sizes: images-{len(images)}, ekeys-{len(ekeys)}, dkeys-{len(dkeys)}, captions-{len(captions)}, lengths-{lengths}')
 
+    losses, (encoded_images, noised_images, decoded_messages, predicted_sents) = \
+        hidden_net.validate_on_batch([images, ekeys, dkeys, captions, lengths])
     predicted_sents = predicted_sents.cpu().numpy()
     for i in range(args.batch_size):
         try:
@@ -104,7 +110,9 @@ def main():
         except IndexError:
             print(f'{i}th batch does not have enough length.')
 
-    utils.save_images(images.cpu(), encoded_images.cpu(),
+    noise_images = images - encoded_images
+
+    utils.save_images_with_noise(images.cpu(), encoded_images.cpu(), noise_images.cpu(),
                       'test_%d' % i, '.', resize_to=(256, 256))
 
 

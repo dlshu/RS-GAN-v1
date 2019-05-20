@@ -49,11 +49,10 @@ def train(model: Hidden,
         training_losses = defaultdict(AverageMeter)
         epoch_start = time.time()
         step = 1
-        for image, caption, length in train_data:
-            image, caption = image.to(device), caption.to(device)
-            #import random
-            #image, caption = image.to(device), random.choice(train_data[1]).to(device)
-            losses, _ = model.train_on_batch([image, caption, length])
+        for image, ekeys, dkeys, caption, length in train_data:
+            image, caption, ekeys, dkeys = image.to(device), caption.to(device), ekeys.to(device), dkeys.to(device)
+
+            losses, _ = model.train_on_batch([image, ekeys, dkeys, caption, length])
 
             for name, loss in losses.items():
                 training_losses[name].update(loss)
@@ -79,11 +78,11 @@ def train(model: Hidden,
         validation_losses = defaultdict(AverageMeter)
         logging.info('Running validation for epoch {}/{}'.format(epoch,
                                                                  train_options.number_of_epochs))
-        for image, caption, length in val_data:
-            image, caption = image.to(device), caption.to(device)
+        for image, ekeys, dkeys, caption, length in val_data:
+            image, caption, ekeys, dkeys = image.to(device), caption.to(device), ekeys.to(device), dkeys.to(device)
 
             losses, (encoded_images, noised_images, decoded_messages, predicted_sents) = \
-                model.validate_on_batch([image, caption, length])
+                model.validate_on_batch([image, ekeys, dkeys, caption, length])
 
             #print(predicted)
             #exit()

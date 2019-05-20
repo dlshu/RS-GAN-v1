@@ -20,7 +20,7 @@ from PIL import Image
 from build_vocab import Vocabulary
 from pycocotools.coco import COCO
 import random
-
+import numpy as np
 def image_to_tensor(image):
     """
     Transforms a numpy-image into torch tensor
@@ -61,6 +61,24 @@ def save_images(original_images, watermarked_images, epoch, folder, resize_to=No
     filename = os.path.join(folder, 'epoch-{}.png'.format(epoch))
     torchvision.utils.save_image(stacked_images, filename, original_images.shape[0], normalize=False)
 
+# images saving with noise
+def save_images_with_noise(original_images, watermarked_images, noise_images, epoch, folder, resize_to=None):
+    images = original_images[:original_images.shape[0], :, :, :].cpu()
+    watermarked_images = watermarked_images[:watermarked_images.shape[0], :, :, :].cpu()
+    noise_images = noise_images[:watermarked_images.shape[0], :, :, :].cpu()
+
+    images = (images + 1) / 2
+    watermarked_images = (watermarked_images + 1) / 2
+    noise_images = (noise_images + 1) / 2
+
+    if resize_to is not None:
+        images = F.interpolate(images, size=resize_to)
+        watermarked_images = F.interpolate(watermarked_images, size=resize_to)
+        noise_images = F.interpolate(noise_images, size=resize_to)
+
+    stacked_images = torch.cat([images, watermarked_images, noise_images], dim=0)
+    filename = os.path.join(folder, 'epoch-{}.png'.format(epoch))
+    torchvision.utils.save_image(stacked_images, filename, original_images.shape[0], normalize=False)
 
 def sorted_nicely(l):
     """ Sort the given iterable in the way that humans expect."""
@@ -228,7 +246,12 @@ class CocoDataset(data.Dataset):
         caption.extend([vocab(token) for token in tokens])
         caption.append(vocab('<end>'))
         target = torch.Tensor(caption)
-        return image, target
+
+        # generate encrypt keys using
+        keys = np.random.permutation(512)
+        ekeys = np.eye(512)[keys]
+        dkeys = np.transpose(ekeys)
+        return image, target, torch.Tensor(ekeys), torch.Tensor(dkeys)
 
     def __len__(self):
         return len(self.ids)
@@ -252,10 +275,10 @@ def collate_fn(data):
     """
     # Sort a data list by caption length (descending order).
     data.sort(key=lambda x: len(x[1]), reverse=True)
-    images, captions = zip(*data)
+    images, captions, ekeys, dkeys = zip(*data)
 
     # Merge images (from tuple of 3D tensor to 4D tensor).
-    images = torch.stack(images, 0)
+    images, ekeys, dkeys = torch.stack(images, 0), torch.stack(ekeys, 0), torch.stack(dkeys, 0)
 
     # Merge captions (from tuple of 1D tensor to 2D tensor).
     lengths = [len(cap) for cap in captions]
@@ -264,4 +287,4 @@ def collate_fn(data):
         end = lengths[i]
         targets[i, :end] = cap[:end]
     targets = targets[torch.randperm(targets.size(0))]
-    return images, targets, lengths
+    return images, ekeys, dkeys, targets, lengths
