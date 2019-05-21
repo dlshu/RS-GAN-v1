@@ -43,27 +43,18 @@ class Encoder(nn.Module):
         return im_w
 
 class EncoderRNN(nn.Module):
-    def __init__(self, config: HiDDenConfiguration):
-        #embed_size, hidden_size, vocab_size, num_layers, max_seq_length=20
-        """Set the hyper-parameters and build the layers."""
+    def __init__(self, input_size, hidden_size):
         super(EncoderRNN, self).__init__()
+        self.hidden_size = hidden_size
 
-        embed_size = config.embed_size
-        hidden_size = config.message_length
-        num_layers = config.num_layers
-        max_seg_length = config.max_seg_length
-        vocab_size = config.vocab_size
+        self.embedding = nn.Embedding(input_size, hidden_size)
+        self.gru = nn.GRU(hidden_size, hidden_size)
 
-        self.embed = nn.Embedding(vocab_size, embed_size)
-        self.rnn = nn.GRU(embed_size, hidden_size, num_layers, bidirectional=True, batch_first=True)
+    def forward(self, input, hidden):
+        embedded = self.embedding(input).view(1, 1, -1)
+        output = embedded
+        output, hidden = self.gru(output, hidden)
+        return output, hidden
 
-        self.max_seg_length = max_seg_length
-
-    def forward(self, captions, lengths):
-        """Decode feature vectors and generates captions."""
-        embeddings = self.embed(captions)
-        packed = pack_padded_sequence(embeddings, lengths, batch_first=True)
-        _, hidden = self.rnn(packed)
-        #hidden = hidden.squeeze()
-        hidden = hidden.reshape(hidden.size(1), -1)
-        return hidden
+    def initHidden(self):
+        return torch.zeros(1, 1, self.hidden_size, device=device)
