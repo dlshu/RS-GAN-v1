@@ -86,14 +86,14 @@ def train(model: Hidden,
 
             #print(predicted)
             #exit()
-            predicted_sents = predicted_sents.cpu().numpy()
-            for i in range(train_options.batch_size):
-                try:
-                    #print(''.join([vocab.idx2word[int(w)] + ' ' for w in predicted.cpu().numpy()[i::train_options.batch_size]][1:length[i]-1]))
-                    print("".join([vocab.idx2word[int(idx)]+' ' for idx in predicted_sents[i]]))
-                    break
-                except IndexError:
-                    print(f'{i}th batch does not have enough length.')
+            # predicted_sents = predicted_sents.cpu().numpy()
+            # for i in range(train_options.batch_size):
+            #     try:
+            #         #print(''.join([vocab.idx2word[int(w)] + ' ' for w in predicted.cpu().numpy()[i::train_options.batch_size]][1:length[i]-1]))
+            #         print("".join([vocab.idx2word[int(idx)]+' ' for idx in predicted_sents[i]]))
+            #         break
+            #     except IndexError:
+            #         print(f'{i}th batch does not have enough length.')
 
             for name, loss in losses.items():
                 validation_losses[name].update(loss)

@@ -39,21 +39,34 @@ class Decoder(nn.Module):
 
 
 class DecoderRNN(nn.Module):
-    def __init__(self, hidden_size, output_size):
+    def __init__(self, config: HiDDenConfiguration):
+        """Set the hyper-parameters and build the layers."""
         super(DecoderRNN, self).__init__()
-        self.hidden_size = hidden_size
 
-        self.embedding = nn.Embedding(output_size, hidden_size)
-        self.gru = nn.GRU(hidden_size, hidden_size)
-        self.out = nn.Linear(hidden_size, output_size)
-        self.softmax = nn.LogSoftmax(dim=1)
+        embed_size = config.embed_size
+        hidden_size = config.message_length
+        num_layers = config.num_layers
+        max_seg_length = config.max_seg_length
+        vocab_size = config.vocab_size
 
-    def forward(self, input, hidden):
-        output = self.embedding(input).view(1, 1, -1)
-        output = F.relu(output)
-        output, hidden = self.gru(output, hidden)
-        output = self.softmax(self.out(output[0]))
-        return output, hidden
+        self.embed = nn.Embedding(vocab_size, embed_size)
+        self.gru = nn.GRU(embed_size, hidden_size, num_layers, batch_first=True)
+        self.linear = nn.Linear(2*hidden_size, vocab_size)
+        self.max_seg_length = max_seg_length
 
-    def initHidden(self):
-        return torch.zeros(1, 1, self.hidden_size, device=device)
+    def forward(self, features, captions, lengths):
+        """Decode feature vectors and generates captions."""
+        embeddings = self.embed(captions)
+        features = features.reshape(2, features.size(0), -1)
+
+        packed = pack_padded_sequence(embeddings, lengths, batch_first=True)
+        outputs, _ = self.gru(packed, features)
+        output = self.linear(outputs[0])
+        with torch.no_grad():
+            output_detach = pad_packed_sequence(outputs, batch_first=True)[0]
+            output_detach = output_detach.contiguous()
+            batch_size, max_length, dims = output_detach.size()
+            output_detach = self.linear(output_detach.view(batch_size * max_length, dims))
+            _, predicted_sents = torch.max(output_detach.data, 1)
+            predicted_sents = predicted_sents.view(batch_size, max_length)
+        return output, predicted_sents

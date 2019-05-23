@@ -8,6 +8,7 @@ import logging
 
 import torch
 from torchvision import datasets, transforms
+import torchaudio
 import torchvision.utils
 from torch.utils import data
 import torch.nn.functional as F
@@ -158,15 +159,32 @@ def get_data_loaders(hidden_config: HiDDenConfiguration, train_options: Training
         ])
     }
 
-     train_images = datasets.ImageFolder(train_options.train_folder, data_transforms['train'])
-     train_data = CocoDataset(root=train_options.train_folder, json=train_options.ann_train, vocab=vocab, sample=10000, transform=data_transforms['train'])
-     train_loader = torch.utils.data.DataLoader(train_data, batch_size=train_options.batch_size, shuffle=True,
+    audio_transforms = {
+        'train': torchaudio.transforms.Compose([
+            torchaudio.transforms.Scale(),
+            torchaudio.transforms.PadTrim(16000)
+        ]),
+        'test': torchaudio.transforms.Compose([
+            torchaudio.transforms.Scale(),
+            torchaudio.transforms.PadTrim(16000)
+        ])
+    }
+
+    audio_data = torchaudio.datasets.VCTK(train_options.train_folder, download=True, transform=data_transforms['train'])
+    audio_data_size = len(audio_data)
+
+    train_images = datasets.ImageFolder(train_options.train_folder, data_transforms['train'])
+    train_audios = audio_data[:0.8*audio_data_size]
+    train_data = CocoDataset(root=train_options.train_folder, audio=train_audios, json=train_options.ann_train, vocab=vocab, sample=10000, transform=data_transforms['train'])
+    train_loader = torch.utils.data.DataLoader(train_data, batch_size=train_options.batch_size, shuffle=True,
                                                 num_workers=4, collate_fn=collate_fn)
 
-     validation_images = datasets.ImageFolder(train_options.validation_folder, data_transforms['test'])
-     val_data = CocoDataset(root=train_options.validation_folder, json=train_options.ann_val, vocab=vocab, sample=1000, transform=data_transforms['test'])
-     validation_loader = torch.utils.data.DataLoader(val_data, batch_size=train_options.batch_size,
+    validation_images = datasets.ImageFolder(train_options.validation_folder, data_transforms['test'])
+    val_audios = audio_data[0.8*audio_data_size:]
+    val_data = CocoDataset(root=train_options.validation_folder, audio=val_audios, json=train_options.ann_val, vocab=vocab, sample=1000, transform=data_transforms['test'])
+    validation_loader = torch.utils.data.DataLoader(val_data, batch_size=train_options.batch_size,
                                                      shuffle=False, num_workers=4, collate_fn=collate_fn)
+
 
     return train_loader, validation_loader
 
@@ -210,7 +228,7 @@ def write_losses(file_name, losses_accu, epoch, duration):
 
 class CocoDataset(data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
-    def __init__(self, root, json, vocab, sample=None, transform=None):
+    def __init__(self, root, json, vocab, audio, sample=None, transform=None):
         """Set the path for images, captions and vocabulary wrapper.
 
         Args:
@@ -226,12 +244,14 @@ class CocoDataset(data.Dataset):
             self.ids = random.sample(self.ids, sample)
         self.vocab = vocab
         self.transform = transform
+        self.audio = audio
 
     def __getitem__(self, index):
         """Returns one data pair (image and caption)."""
         coco = self.coco
         vocab = self.vocab
         ann_id = self.ids[index]
+        audios = self.audio
         caption = coco.anns[ann_id]['caption']
         img_id = coco.anns[ann_id]['image_id']
         path = coco.loadImgs(img_id)[0]['file_name']
@@ -240,19 +260,21 @@ class CocoDataset(data.Dataset):
         if self.transform is not None:
             image = self.transform(image)
 
-        # Convert caption (string) to word ids.
-        tokens = nltk.tokenize.word_tokenize(str(caption).lower())
-        caption = []
-        caption.append(vocab('<start>'))
-        caption.extend([vocab(token) for token in tokens])
-        caption.append(vocab('<end>'))
-        target = torch.Tensor(caption)
+        # # Convert caption (string) to word ids.
+        # tokens = nltk.tokenize.word_tokenize(str(caption).lower())
+        # caption = []
+        # caption.append(vocab('<start>'))
+        # caption.extend([vocab(token) for token in tokens])
+        # caption.append(vocab('<end>'))
+        # target = torch.Tensor(caption)
 
         # generate encrypt keys using
         keys = np.random.permutation(512)
         ekeys = np.eye(512)[keys]
         dkeys = np.transpose(ekeys)
-        return image, target, torch.Tensor(ekeys), torch.Tensor(dkeys)
+
+        audio = np.random.choice(audios)
+        return image, audio, torch.Tensor(ekeys), torch.Tensor(dkeys)
 
     def __len__(self):
         return len(self.ids)

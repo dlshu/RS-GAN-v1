@@ -74,8 +74,7 @@ def main():
     checkpoint = None
     loaded_checkpoint_file_name = None
 
-    with open(args.vocab_path, 'rb') as f:
-        vocab = pickle.load(f)
+    vocab = None
 
     if args.command == 'continue':
         this_run_folder = args.folder
@@ -124,7 +123,7 @@ def main():
                                             decoder_loss=1,
                                             encoder_loss=0.7,
                                             adversarial_loss=1e-3,
-                                            vocab_size=len(vocab),
+                                            vocab_size=0,
                                             enable_fp16=args.enable_fp16
                                             )
 
