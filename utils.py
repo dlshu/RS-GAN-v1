@@ -170,21 +170,20 @@ def get_data_loaders(hidden_config: HiDDenConfiguration, train_options: Training
         ])
     }
 
-    audio_data = torchaudio.datasets.VCTK(train_options.train_folder, download=True, transform=data_transforms['train'])
+    audio_data = torchaudio.datasets.VCTK('./audio_data', transform=data_transforms['train'])
     audio_data_size = len(audio_data)
+    train_size = int(0.8*audio_data_size)
+    #train_images = datasets.ImageFolder(train_options.train_folder, data_transforms['train'])
+    train_audios, val_audios = torch.utils.data.random_split(audio_data, [train_size, audio_data_size-train_size])
 
-    train_images = datasets.ImageFolder(train_options.train_folder, data_transforms['train'])
-    train_audios = audio_data[:0.8*audio_data_size]
     train_data = CocoDataset(root=train_options.train_folder, audio=train_audios, json=train_options.ann_train, vocab=vocab, sample=10000, transform=data_transforms['train'])
     train_loader = torch.utils.data.DataLoader(train_data, batch_size=train_options.batch_size, shuffle=True,
                                                 num_workers=4, collate_fn=collate_fn)
 
-    validation_images = datasets.ImageFolder(train_options.validation_folder, data_transforms['test'])
-    val_audios = audio_data[0.8*audio_data_size:]
+    #validation_images = datasets.ImageFolder(train_options.validation_folder, data_transforms['test'])
     val_data = CocoDataset(root=train_options.validation_folder, audio=val_audios, json=train_options.ann_val, vocab=vocab, sample=1000, transform=data_transforms['test'])
     validation_loader = torch.utils.data.DataLoader(val_data, batch_size=train_options.batch_size,
                                                      shuffle=False, num_workers=4, collate_fn=collate_fn)
-
 
     return train_loader, validation_loader
 
@@ -273,7 +272,7 @@ class CocoDataset(data.Dataset):
         ekeys = np.eye(512)[keys]
         dkeys = np.transpose(ekeys)
 
-        audio = np.random.choice(audios)
+        audio = audios
         return image, audio, torch.Tensor(ekeys), torch.Tensor(dkeys)
 
     def __len__(self):
@@ -300,14 +299,15 @@ def collate_fn(data):
     data.sort(key=lambda x: len(x[1]), reverse=True)
     images, captions, ekeys, dkeys = zip(*data)
 
-    # Merge images (from tuple of 3D tensor to 4D tensor).
-    images, ekeys, dkeys = torch.stack(images, 0), torch.stack(ekeys, 0), torch.stack(dkeys, 0)
 
-    # Merge captions (from tuple of 1D tensor to 2D tensor).
+    # Merge images (from tuple of 3D tensor to 4D tensor).
+    images, ekeys, dkeys, targets = torch.stack(images, 0), torch.stack(ekeys, 0), torch.stack(dkeys, 0),  captions[:][0]
+
+    # # Merge captions (from tuple of 1D tensor to 2D tensor).
     lengths = [len(cap) for cap in captions]
-    targets = torch.zeros(len(captions), max(lengths)).long()
-    for i, cap in enumerate(captions):
-        end = lengths[i]
-        targets[i, :end] = cap[:end]
-    targets = targets[torch.randperm(targets.size(0))]
+    # targets = torch.zeros(len(captions), max(lengths)).long()
+    # for i, cap in enumerate(captions):
+    #     end = lengths[i]
+    #     targets[i, :end] = cap[:end]
+    # targets = targets[torch.randperm(targets.size(0))]
     return images, ekeys, dkeys, targets, lengths
