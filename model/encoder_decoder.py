@@ -36,12 +36,12 @@ class EncoderDecoder(nn.Module):
     def forward(self, image, ekeys, dkeys, caption, length):
         encoded_message = self.encode_rnn(caption, length)
         #print(encoded_message.shape, ekeys.shape)
-        encoded_message = torch.bmm(encoded_message.unsqueeze(1), ekeys).squeeze()
+        #encoded_message = torch.bmm(encoded_message.unsqueeze(1), ekeys).squeeze()
         encoded_image = self.encoder(image, encoded_message)
         noised_and_cover = self.noiser([encoded_image, image])
         noised_image = noised_and_cover[0]
         decoded_message = self.decoder(noised_image)
-        decoded_message = torch.bmm(decoded_message.unsqueeze(1), dkeys).squeeze()
+        #decoded_message = torch.bmm(decoded_message.unsqueeze(1), dkeys).squeeze()
         decode_sentence, predicted_sent = self.decode_rnn(decoded_message, caption, length)
 
         #adversarial_decode_sentence, adversarial_predicted_sent = \

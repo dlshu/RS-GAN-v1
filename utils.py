@@ -162,15 +162,15 @@ def get_data_loaders(hidden_config: HiDDenConfiguration, train_options: Training
     audio_transforms = {
         'train': torchaudio.transforms.Compose([
             torchaudio.transforms.Scale(),
-            torchaudio.transforms.PadTrim(16000)
+            torchaudio.transforms.PadTrim(hidden_config.message_length)
         ]),
         'test': torchaudio.transforms.Compose([
             torchaudio.transforms.Scale(),
-            torchaudio.transforms.PadTrim(16000)
+            torchaudio.transforms.PadTrim(hidden_config.message_length)
         ])
     }
 
-    audio_data = torchaudio.datasets.VCTK('./audio_data', transform=data_transforms['train'])
+    audio_data = torchaudio.datasets.VCTK('./audio_data', transform=audio_transforms['train'])
     audio_data_size = len(audio_data)
     train_size = int(0.8*audio_data_size)
     #train_images = datasets.ImageFolder(train_options.train_folder, data_transforms['train'])
@@ -272,7 +272,8 @@ class CocoDataset(data.Dataset):
         ekeys = np.eye(512)[keys]
         dkeys = np.transpose(ekeys)
 
-        audio = audios
+        # audio tuple (data, class)
+        audio = random.choice(audios)[0]
         return image, audio, torch.Tensor(ekeys), torch.Tensor(dkeys)
 
     def __len__(self):
@@ -299,12 +300,13 @@ def collate_fn(data):
     data.sort(key=lambda x: len(x[1]), reverse=True)
     images, captions, ekeys, dkeys = zip(*data)
 
+    lengths = [len(cap) for cap in captions]
 
     # Merge images (from tuple of 3D tensor to 4D tensor).
-    images, ekeys, dkeys, targets = torch.stack(images, 0), torch.stack(ekeys, 0), torch.stack(dkeys, 0),  captions[:][0]
+    images, ekeys, dkeys, targets = torch.stack(images, 0), torch.stack(ekeys, 0), torch.stack(dkeys, 0),  torch.stack(captions, 0)
 
     # # Merge captions (from tuple of 1D tensor to 2D tensor).
-    lengths = [len(cap) for cap in captions]
+
     # targets = torch.zeros(len(captions), max(lengths)).long()
     # for i, cap in enumerate(captions):
     #     end = lengths[i]

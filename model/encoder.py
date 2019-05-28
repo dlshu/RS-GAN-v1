@@ -63,7 +63,7 @@ class EncoderRNN(nn.Module):
         """Decode feature vectors and generates captions."""
         embeddings = self.embed(captions)
         packed = pack_padded_sequence(embeddings, lengths, batch_first=True)
-        _, hidden = self.rnn(packed)
+        _, hidden = self.rnn(captions)
         #hidden = hidden.squeeze()
         hidden = hidden.reshape(hidden.size(1), -1)
         return hidden
