@@ -32,7 +32,7 @@ def main():
 
     new_run_parser.add_argument(
         '--batch-size', '-b', required=True, type=int, help='The batch size.')
-    new_run_parser.add_argument('--epochs', '-e', default=300,
+    new_run_parser.add_argument('--epochs', '-e', default=30,
                                 type=int, help='Number of epochs to run the simulation.')
     new_run_parser.add_argument(
         '--name', required=True, type=str, help='The name of the experiment.')

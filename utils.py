@@ -1,4 +1,3 @@
-import numpy as np
 import os
 import re
 import csv
@@ -16,9 +15,7 @@ import torch.nn.functional as F
 from options import HiDDenConfiguration, TrainingOptions
 from model.hidden import Hidden
 
-import nltk
 from PIL import Image
-from build_vocab import Vocabulary
 from pycocotools.coco import COCO
 import random
 import numpy as np
@@ -80,6 +77,19 @@ def save_images_with_noise(original_images, watermarked_images, noise_images, ep
     stacked_images = torch.cat([images, watermarked_images, noise_images], dim=0)
     filename = os.path.join(folder, 'epoch-{}.png'.format(epoch))
     torchvision.utils.save_image(stacked_images, filename, original_images.shape[0], normalize=False)
+
+
+def save_audio(caption, decoded_messages, folder, epoch, sample_rate=16000):
+    # caption is the original audio
+    caption = caption.contiguous().view(caption.size(0), -1).cpu()
+    decoded_messages = decoded_messages.contiguous().view(decoded_messages.size(0), -1).cpu()
+    for (i, audio) in enumerate(decoded_messages):
+        filename = os.path.join(folder, f'epoch-{epoch}-{i}.wav')
+        torchaudio.save(filename, audio, sample_rate)
+    for (i, audio) in enumerate(caption):
+        filename = os.path.join(folder, f'epoch-{epoch}-{i}-original.wav')
+        torchaudio.save(filename, audio, sample_rate)
+
 
 def sorted_nicely(l):
     """ Sort the given iterable in the way that humans expect."""
@@ -161,20 +171,23 @@ def get_data_loaders(hidden_config: HiDDenConfiguration, train_options: Training
 
     audio_transforms = {
         'train': torchaudio.transforms.Compose([
-            torchaudio.transforms.Scale(),
             torchaudio.transforms.PadTrim(hidden_config.message_length)
         ]),
-        'test': torchaudio.transforms.Compose([
-            torchaudio.transforms.Scale(),
+        'valid': torchaudio.transforms.Compose([
             torchaudio.transforms.PadTrim(hidden_config.message_length)
         ])
     }
 
-    audio_data = torchaudio.datasets.VCTK('./audio_data', transform=audio_transforms['train'])
-    audio_data_size = len(audio_data)
-    train_size = int(0.8*audio_data_size)
+    #audio_data = torchaudio.datasets.VCTK('./audio_data', transform=audio_transforms['train'])
+    #audio_data_size = len(audio_data)
+    #train_size = int(0.8*audio_data_size)
     #train_images = datasets.ImageFolder(train_options.train_folder, data_transforms['train'])
-    train_audios, val_audios = torch.utils.data.random_split(audio_data, [train_size, audio_data_size-train_size])
+    #train_audios, val_audios = torch.utils.data.random_split(audio_data, [train_size, audio_data_size-train_size])
+
+    train_audios = AudioDataset('./audio_data/drums/train', hidden_config.embed_size, normalization=True,
+                                transform=audio_transforms['train'])
+    val_audios = AudioDataset('./audio_data/drums/valid', hidden_config.embed_size, normalization=True,
+                              transform=audio_transforms['valid'])
 
     train_data = CocoDataset(root=train_options.train_folder, audio=train_audios, json=train_options.ann_train, vocab=vocab, sample=10000, transform=data_transforms['train'])
     train_loader = torch.utils.data.DataLoader(train_data, batch_size=train_options.batch_size, shuffle=True,
@@ -211,6 +224,7 @@ def create_folder_for_run(runs_folder, experiment_name):
     os.makedirs(this_run_folder)
     os.makedirs(os.path.join(this_run_folder, 'checkpoints'))
     os.makedirs(os.path.join(this_run_folder, 'images'))
+    os.makedirs(os.path.join(this_run_folder, 'audio'))
 
     return this_run_folder
 
@@ -224,6 +238,26 @@ def write_losses(file_name, losses_accu, epoch, duration):
         row_to_write = [epoch] + ['{:.4f}'.format(loss_avg.avg) for loss_avg in losses_accu.values()] + [
             '{:.0f}'.format(duration)]
         writer.writerow(row_to_write)
+
+
+class AudioDataset(data.Dataset):
+
+    def __init__(self, root, embed_size, normalization=True, transform=None):
+        self.root = root
+        self.normalization = normalization
+        self.audio_list = os.listdir(root)
+        self.len = len(self.audio_list)
+        self.embed_size = embed_size
+
+    def __getitem__(self, item):
+        audio = torchaudio.load(os.path.join(self.root, self.audio_list[item % self.len]),
+                                normalization=True)
+
+        return audio[0].view(-1, self.embed_size)
+
+    def __len__(self):
+        return self.len
+
 
 class CocoDataset(data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
@@ -273,7 +307,7 @@ class CocoDataset(data.Dataset):
         dkeys = np.transpose(ekeys)
 
         # audio tuple (data, class)
-        audio = random.choice(audios)[0]
+        audio = audios[index]
         return image, audio, torch.Tensor(ekeys), torch.Tensor(dkeys)
 
     def __len__(self):

@@ -22,7 +22,8 @@ class Encoder(nn.Module):
             layers.append(layer)
 
         self.conv_layers = nn.Sequential(*layers)
-        self.after_concat_layer = ConvBNRelu(self.conv_channels + 3 + 2*config.message_length,
+        # 2* to 1* due to current audio type
+        self.after_concat_layer = ConvBNRelu(self.conv_channels + 3 + 1*config.message_length,
                                              self.conv_channels)
 
         self.final_layer = nn.Conv2d(self.conv_channels, 3, kernel_size=1)
@@ -54,6 +55,7 @@ class EncoderRNN(nn.Module):
         max_seg_length = config.max_seg_length
         vocab_size = config.vocab_size
 
+        self.config = config
         self.embed = nn.Embedding(vocab_size, embed_size)
         self.rnn = nn.GRU(embed_size, hidden_size, num_layers, batch_first=True)
 
@@ -61,9 +63,9 @@ class EncoderRNN(nn.Module):
 
     def forward(self, captions, lengths):
         """Decode feature vectors and generates captions."""
-        embeddings = self.embed(captions)
-        packed = pack_padded_sequence(embeddings, lengths, batch_first=True)
+        #embeddings = self.embed(captions)
+        #packed = pack_padded_sequence(embeddings, lengths, batch_first=True)
         _, hidden = self.rnn(captions)
-        #hidden = hidden.squeeze()
-        hidden = hidden.reshape(hidden.size(1), -1)
+        hidden = hidden.squeeze()
+        #hidden = hidden.reshape(hidden.size(1), -1)
         return hidden

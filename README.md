@@ -76,6 +76,8 @@ Put it another way, given an image with dimensions **_H x W,_** the Crop() will 
 ## Experiments
 The data for some of the experiments are stored in './experiments/<name of the experiment> folder. This includes: figures, detailed training and validation losses, all the settings in *pickle* format, and the checkpoint file of the trained model. Here, we provide summary of the experiments.
 
+For the audio part, we conduct our experiments using:
+```python main.py new --name combined-noise --data-dir ./data/ --batch-size 28 --noise crop((0.2,0.3),(0.4,0.5))+cropout((0.11,0.22),(0.33,0.44))+dropout(0.2,0.3)+jpeg()```
 ### Setup
 We try to follow the experimental setup of the original paper as closely as possibly.
 We train the network on 10,000 random images from [COCO dataset](http://cocodataset.org/#home). We use 200-400 epochs for training and validation.

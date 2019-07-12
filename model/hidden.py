@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torchaudio
 
 from options import HiDDenConfiguration
 from model.discriminator import Discriminator
@@ -81,8 +82,8 @@ class Hidden:
             d_loss_on_cover.backward()
 
             # train on fake
-            encoded_images, noised_images, decoded_captions, \
-                encoded_message, decoded_message, _ = self.encoder_decoder(images, ekeys, dkeys, captions, lengths)
+            encoded_images, noised_images, \
+                encoded_message, decoded_message, = self.encoder_decoder(images, ekeys, dkeys, captions, lengths)
             d_on_encoded = self.discriminator(encoded_images.detach())
             d_loss_on_encoded = self.bce_with_logits_loss(d_on_encoded, d_target_label_encoded)
 
@@ -102,12 +103,12 @@ class Hidden:
                 vgg_on_enc = self.vgg_loss(encoded_images)
                 g_loss_enc = self.mse_loss(vgg_on_cov, vgg_on_enc)
 
-            targets = pack_padded_sequence(captions, lengths, batch_first=True)[0]
+            # targets = pack_padded_sequence(captions, lengths, batch_first=True)[0]
 
-            _, predicted = torch.max(decoded_captions.data, 1)
-            bitwise_avg_err = (predicted == targets).sum().item()/targets.size(0)
+            # _, predicted = torch.max(decoded_captions.data, 1)
+            #bitwise_avg_err = (predicted == targets).sum().item()/targets.size(0)
 
-            g_loss_dec = self.ce_loss(decoded_captions, targets)  + self.mse_loss(encoded_message, decoded_message)
+            g_loss_dec = self.mse_loss(captions, decoded_message)
             g_loss = self.config.adversarial_loss * g_loss_adv + self.config.encoder_loss * g_loss_enc \
                      + self.config.decoder_loss * g_loss_dec
 
@@ -118,12 +119,11 @@ class Hidden:
             'loss           ': g_loss.item(),
             'encoder_mse    ': g_loss_enc.item(),
             'dec_mse        ': g_loss_dec.item(),
-            'bitwise-error  ': bitwise_avg_err,
             'adversarial_bce': g_loss_adv.item(),
             'discr_cover_bce': d_loss_on_cover.item(),
             'discr_encod_bce': d_loss_on_encoded.item()
         }
-        return losses, (encoded_images, noised_images, decoded_captions)
+        return losses, (encoded_images, noised_images, 0)
 
     def validate_on_batch(self, batch: list):
         """
@@ -154,8 +154,8 @@ class Hidden:
             d_on_cover = self.discriminator(images)
             d_loss_on_cover = self.bce_with_logits_loss(d_on_cover, d_target_label_cover)
 
-            encoded_images, noised_images, decoded_captions, \
-                encoded_message, decoded_message, predicted_sents = self.encoder_decoder(images, ekeys, dkeys, captions, lengths)
+            encoded_images, noised_images, \
+                encoded_message, decoded_message, = self.encoder_decoder(images, ekeys, dkeys, captions, lengths)
 
             d_on_encoded = self.discriminator(encoded_images)
             d_loss_on_encoded = self.bce_with_logits_loss(d_on_encoded, d_target_label_encoded)
@@ -170,25 +170,23 @@ class Hidden:
                 vgg_on_enc = self.vgg_loss(encoded_images)
                 g_loss_enc = self.mse_loss(vgg_on_cov, vgg_on_enc)
 
-            targets = pack_padded_sequence(captions, lengths, batch_first=True)[0]
-            g_loss_dec = self.ce_loss(decoded_captions, targets)  + self.mse_loss(encoded_message, decoded_message)
+            # targets = pack_padded_sequence(captions, lengths, batch_first=True)[0]
+            g_loss_dec = self.mse_loss(captions, decoded_message)
             g_loss = self.config.adversarial_loss * g_loss_adv + self.config.encoder_loss * g_loss_enc \
                      + self.config.decoder_loss * g_loss_dec
 
-            _, predicted = torch.max(decoded_captions.data, 1)
-            bitwise_avg_err = (predicted == targets).sum().item()/targets.size(0)
             # predicted = pack_padded_sequence(predicted, lengths, batch_first=True)
             # print(predicted)
         losses = {
             'loss           ': g_loss.item(),
             'encoder_mse    ': g_loss_enc.item(),
             'dec_mse        ': g_loss_dec.item(),
-            'bitwise-error  ': bitwise_avg_err,
             'adversarial_bce': g_loss_adv.item(),
             'discr_cover_bce': d_loss_on_cover.item(),
             'discr_encod_bce': d_loss_on_encoded.item()
         }
-        return losses, (encoded_images, noised_images, decoded_captions, predicted_sents)
+
+        return losses, (encoded_images, noised_images, decoded_message)
 
     def to_stirng(self):
         return '{}\n{}'.format(str(self.encoder_decoder), str(self.discriminator))

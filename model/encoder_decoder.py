@@ -42,10 +42,10 @@ class EncoderDecoder(nn.Module):
         noised_image = noised_and_cover[0]
         decoded_message = self.decoder(noised_image)
         #decoded_message = torch.bmm(decoded_message.unsqueeze(1), dkeys).squeeze()
-        decode_sentence, predicted_sent = self.decode_rnn(decoded_message, caption, length)
+        decode_sentence, decoded_message = self.decode_rnn(decoded_message, caption, length)
 
         #adversarial_decode_sentence, adversarial_predicted_sent = \
         #    self.decode_rnn(encoded_message, caption, length)
 
-        return encoded_image, noised_image, decode_sentence, \
-            encoded_message, decoded_message, predicted_sent
+        return encoded_image, noised_image, \
+            encoded_message, decoded_message

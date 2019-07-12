@@ -81,7 +81,7 @@ def train(model: Hidden,
         for image, ekeys, dkeys, caption, length in val_data:
             image, caption, ekeys, dkeys = image.to(device), caption.to(device), ekeys.to(device), dkeys.to(device)
 
-            losses, (encoded_images, noised_images, decoded_messages, predicted_sents) = \
+            losses, (encoded_images, noised_images, decoded_messages) = \
                 model.validate_on_batch([image, ekeys, dkeys, caption, length])
 
             #print(predicted)
@@ -107,6 +107,7 @@ def train(model: Hidden,
                                   epoch,
                                   os.path.join(this_run_folder, 'images'), resize_to=saved_images_size)
                 first_iteration = False
+            utils.save_audio(caption, decoded_messages, os.path.join(this_run_folder, 'audio'), epoch)
 
         utils.log_progress(validation_losses)
         logging.info('-' * 40)
