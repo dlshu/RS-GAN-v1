@@ -153,7 +153,7 @@ def load_options(options_file_name) -> (TrainingOptions, HiDDenConfiguration, di
     return train_options, hidden_config, noise_config
 
 
-def get_data_loaders(hidden_config: HiDDenConfiguration, train_options: TrainingOptions, vocab):
+def get_data_loaders(hidden_config: HiDDenConfiguration, train_options: TrainingOptions, vocab=None):
     """ Get torch data loaders for training and validation. The data loaders take a crop of the image,
     transform it into tensor, and normalize it."""
     data_transforms = {
@@ -171,10 +171,10 @@ def get_data_loaders(hidden_config: HiDDenConfiguration, train_options: Training
 
     audio_transforms = {
         'train': torchaudio.transforms.Compose([
-            torchaudio.transforms.PadTrim(hidden_config.message_length)
+            torchaudio.transforms.PadTrim(16384)
         ]),
         'valid': torchaudio.transforms.Compose([
-            torchaudio.transforms.PadTrim(hidden_config.message_length)
+            torchaudio.transforms.PadTrim(16384)
         ])
     }
 
@@ -184,9 +184,9 @@ def get_data_loaders(hidden_config: HiDDenConfiguration, train_options: Training
     #train_images = datasets.ImageFolder(train_options.train_folder, data_transforms['train'])
     #train_audios, val_audios = torch.utils.data.random_split(audio_data, [train_size, audio_data_size-train_size])
 
-    train_audios = AudioDataset('./audio_data/drums/train', hidden_config.embed_size, normalization=True,
+    train_audios = AudioDataset('./audio_data/speech/train', hidden_config.embed_size, normalization=True,
                                 transform=audio_transforms['train'])
-    val_audios = AudioDataset('./audio_data/drums/valid', hidden_config.embed_size, normalization=True,
+    val_audios = AudioDataset('./audio_data/speech/valid', hidden_config.embed_size, normalization=True,
                               transform=audio_transforms['valid'])
 
     train_data = CocoDataset(root=train_options.train_folder, audio=train_audios, json=train_options.ann_train, vocab=vocab, sample=10000, transform=data_transforms['train'])
@@ -248,12 +248,15 @@ class AudioDataset(data.Dataset):
         self.audio_list = os.listdir(root)
         self.len = len(self.audio_list)
         self.embed_size = embed_size
+        self.transform = transform
+
 
     def __getitem__(self, item):
+
         audio = torchaudio.load(os.path.join(self.root, self.audio_list[item % self.len]),
                                 normalization=True)
-
-        return audio[0].view(-1, self.embed_size)
+        audio = self.transform(audio[0])
+        return audio.reshape(-1, self.embed_size)
 
     def __len__(self):
         return self.len
